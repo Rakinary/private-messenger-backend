@@ -38,20 +38,33 @@ export class UsersService {
     });
   }
 
-  async list(currentUserId?: string) {
-    return this.prisma.user.findMany({
-      where: currentUserId ? { id: { not: currentUserId } } : undefined,
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
-  }
+ async list(currentUserId?: string, query?: string) {
+  const normalizedQuery = query?.trim();
+
+  return this.prisma.user.findMany({
+    where: {
+      ...(currentUserId ? { id: { not: currentUserId } } : {}),
+      ...(normalizedQuery
+        ? {
+            username: {
+              contains: normalizedQuery,
+              mode: 'insensitive',
+            },
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      createdAt: true,
+    },
+    orderBy: {
+      username: 'asc',
+    },
+    take: 20,
+  });
+}
 
   async findByIdOrThrow(userId: string) {
     const user = await this.prisma.user.findUnique({
