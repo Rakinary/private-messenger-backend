@@ -33,6 +33,7 @@ model User {
   username     String       @unique
   passwordHash String
   createdAt    DateTime     @default(now())
+  expoPushToken String?      @unique
 
   memberships  ChatMember[]
   messages     Message[]    @relation("MessageSender")

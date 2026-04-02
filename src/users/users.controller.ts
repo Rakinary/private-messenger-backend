@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser, JwtUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
@@ -15,4 +15,13 @@ export class UsersController {
   ) {
     return this.usersService.list(user.sub, query);
   }
+
+  @Post('push-token')
+  savePushToken(
+    @CurrentUser() user: JwtUser,
+    @Body('expoPushToken') expoPushToken?: string,
+  ) {
+    return this.usersService.savePushToken(user.sub, expoPushToken);
+  }
 }
+

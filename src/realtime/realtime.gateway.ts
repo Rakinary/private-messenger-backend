@@ -13,6 +13,7 @@ import { AuthService } from '../auth/auth.service';
 import { ChatsService } from '../chats/chats.service';
 import { CreateMessageDto } from '../messages/dto/create-message.dto';
 import { MessagesService } from '../messages/messages.service';
+import { UsersService } from '../users/users.service';
 
 interface AuthedSocket extends Socket {
   data: {
@@ -41,6 +42,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly authService: AuthService,
     private readonly chatsService: ChatsService,
     private readonly messagesService: MessagesService,
+    private readonly usersService: UsersService,
   ) {}
 
   async handleConnection(client: AuthedSocket) {
@@ -136,7 +138,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     return message;
   }
 
-  async broadcastNewMessage(chatId: string, message: unknown) {
+  async broadcastNewMessage(chatId: string, message: any) {
     const memberIds = await this.chatsService.getChatMemberIds(chatId);
 
     for (const userId of memberIds) {
@@ -144,6 +146,57 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     this.server.to(`chat:${chatId}`).emit('message:new', message);
+
+    await this.sendPushNotifications(chatId, message);
+  }
+
+  private async sendPushNotifications(chatId: string, message: any) {
+    if (!message || !message.senderId || !message.text) {
+      return;
+    }
+
+    const recipientIds = (await this.chatsService.getChatMemberIds(chatId)).filter(
+      (id) => id !== message.senderId,
+    );
+
+    if (recipientIds.length === 0) {
+      return;
+    }
+
+    const usersWithTokens = await this.usersService.getUserPushTokens(recipientIds);
+    const pushTokens = usersWithTokens
+      .map((u) => u.expoPushToken)
+      .filter((token): token is string => !!token);
+
+    if (pushTokens.length === 0) {
+      return;
+    }
+
+    const notifications = pushTokens.map((token) => ({
+      to: token,
+      sound: 'default',
+      title: `Новое сообщение от ${message.sender?.username ?? 'пользователя'}`,
+      body: message.text.length > 100 ? `${message.text.slice(0, 97)}...` : message.text,
+      data: {
+        chatId,
+        messageId: message.id,
+      },
+    }));
+
+    try {
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notifications),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        this.logger.warn(`Expo push failed, status: ${response.status}, body: ${text}`);
+      }
+    } catch (err) {
+      this.logger.warn(`Expo push exception: ${err}`);
+    }
   }
 
   private extractBearer(header?: string) {

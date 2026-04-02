@@ -83,4 +83,35 @@ export class UsersService {
 
     return user;
   }
+
+  async savePushToken(userId: string, expoPushToken?: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { expoPushToken: expoPushToken || null },
+      select: {
+        id: true,
+        username: true,
+        expoPushToken: true,
+      },
+    });
+  }
+
+  async getUserPushTokens(userIds: string[]) {
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    return this.prisma.user.findMany({
+      where: {
+        id: { in: userIds },
+        expoPushToken: { not: null },
+      },
+      select: {
+        id: true,
+        username: true,
+        expoPushToken: true,
+      },
+    });
+  }
 }
+
