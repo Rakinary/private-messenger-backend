@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
 import { CurrentUser, JwtUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
+import { SavePushTokenDto } from './dto/save-push-token.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -17,11 +18,12 @@ export class UsersController {
   }
 
   @Post('push-token')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   savePushToken(
     @CurrentUser() user: JwtUser,
-    @Body('expoPushToken') expoPushToken?: string,
+    @Body() dto: SavePushTokenDto,
   ) {
-    return this.usersService.savePushToken(user.sub, expoPushToken);
+    return this.usersService.savePushToken(user.sub, dto.expoPushToken);
   }
 }
 
